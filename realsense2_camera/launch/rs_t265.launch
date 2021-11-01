@@ -5,13 +5,13 @@ ROS/realsense in upcoming releases. Currently, the API is available in the
 https://github.com/IntelRealSense/librealsense/blob/master/third-party/libtm/libtm/include/TrackingDevice.h#L508-L515.
 -->
 <launch>
-  <arg name="serial_no"           default=""/>
+  <arg name="serial_no"           default="905312110732"/>
   <arg name="usb_port_id"         default=""/>
   <arg name="device_type"         default="t265"/>
-  <arg name="json_file_path"      default=""/>
-  <arg name="camera"              default="camera"/>
+  <arg name="json_file_path"      default="$(find qb)/config/t265_wheel_odom.json"/>
+  <arg name="camera"              default="t265"/>
   <arg name="tf_prefix"           default="$(arg camera)"/>
-
+  <arg name="enable_sync"           default="false"/>
   <arg name="fisheye_width"       default="-1"/> 
   <arg name="fisheye_height"      default="-1"/>
   <arg name="enable_fisheye1"     default="false"/>
@@ -25,15 +25,23 @@ https://github.com/IntelRealSense/librealsense/blob/master/third-party/libtm/lib
   <arg name="enable_accel"        default="true"/>
   <arg name="enable_pose"         default="true"/>
 
-  <arg name="enable_sync"           default="false"/>
+
 
   <arg name="linear_accel_cov"      default="0.01"/>
   <arg name="initial_reset"         default="false"/>
   <arg name="reconnect_timeout"     default="6.0"/>
   <arg name="unite_imu_method"      default=""/>
+  <arg name="base_frame_id"         default="$(arg camera)_link"/>
+  <arg name="pose_frame_id"         default="$(arg camera)_pose"/>
+  <arg name="odom_frame_id"         default="$(arg camera)_odom"/>
+  <arg name="tf_publish_rate"       default="200"/>
+  <arg name="publish_tf"            default="false"/>
 
-  <arg name="publish_odom_tf"     default="true"/>
+  <arg name="publish_odom_tf"     default="false"/>
   
+  <!-- If the parameter below is non-empty, the T265 node will attempt to load a saved map from the given path -->
+  <arg name="localization_map_filepath" default="/home/whoobee/qb/ros_ws/src/qb/config/t265_saved_map_01.bin"/>
+
   <group ns="$(arg camera)">
     <include file="$(find realsense2_camera)/launch/includes/nodelet.launch.xml">
       <arg name="tf_prefix"                value="$(arg tf_prefix)"/>
@@ -60,8 +68,14 @@ https://github.com/IntelRealSense/librealsense/blob/master/third-party/libtm/lib
       <arg name="initial_reset"            value="$(arg initial_reset)"/>
       <arg name="reconnect_timeout"        value="$(arg reconnect_timeout)"/>
       <arg name="unite_imu_method"         value="$(arg unite_imu_method)"/>
-
+      <arg name="base_frame_id"            value="$(arg base_frame_id)"/>
+      <arg name="pose_frame_id"            value="$(arg pose_frame_id)"/> 
+      <arg name="odom_frame_id"            value="$(arg odom_frame_id)"/> 
+      <arg name="tf_publish_rate"          value="$(arg tf_publish_rate)"/> 
+      <arg name="publish_tf"               value="$(arg publish_tf)"/>
       <arg name="publish_odom_tf"          value="$(arg publish_odom_tf)"/>
+
+      <arg name="localization_map_filepath" value="$(arg localization_map_filepath)"/>
     </include>
   </group>
 </launch>
