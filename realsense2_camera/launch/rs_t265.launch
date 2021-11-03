@@ -12,12 +12,12 @@ https://github.com/IntelRealSense/librealsense/blob/master/third-party/libtm/lib
   <arg name="camera"              default="camera"/>
   <arg name="tf_prefix"           default="$(arg camera)"/>
 
-  <arg name="fisheye_width"       default="-1"/> 
-  <arg name="fisheye_height"      default="-1"/>
-  <arg name="enable_fisheye1"     default="false"/>
+  <arg name="fisheye_width"       default="848"/> 
+  <arg name="fisheye_height"      default="800"/>
+  <arg name="enable_fisheye1"     default="true"/>
   <arg name="enable_fisheye2"     default="false"/>
 
-  <arg name="fisheye_fps"         default="-1"/>
+  <arg name="fisheye_fps"         default="30"/>
 
   <arg name="gyro_fps"            default="-1"/>
   <arg name="accel_fps"           default="-1"/>
@@ -33,6 +33,10 @@ https://github.com/IntelRealSense/librealsense/blob/master/third-party/libtm/lib
   <arg name="unite_imu_method"      default=""/>
 
   <arg name="publish_odom_tf"     default="true"/>
+
+  <arg name="map_out" default=""/>
+  <arg name="map_in" default=""/>
+  <arg name="map_frame_id" default="map"/>
   
   <group ns="$(arg camera)">
     <include file="$(find realsense2_camera)/launch/includes/nodelet.launch.xml">
@@ -63,5 +67,8 @@ https://github.com/IntelRealSense/librealsense/blob/master/third-party/libtm/lib
 
       <arg name="publish_odom_tf"          value="$(arg publish_odom_tf)"/>
     </include>
+    <param name="realsense2_camera/map_out" value="$(arg map_out)"/>
+    <param name="realsense2_camera/map_in" value="$(arg map_in)"/>
+    <param name="realsense2_camera/map_frame_id" value="$(arg map_frame_id)"/>
   </group>
 </launch>

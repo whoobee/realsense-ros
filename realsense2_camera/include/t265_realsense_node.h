@@ -12,6 +12,7 @@ namespace realsense2_camera
                           rs2::device dev,
                           const std::string& serial_no);
             virtual void toggleSensors(bool enabled) override;
+            ~T265RealsenseNode();
             virtual void publishTopics() override;
 
         protected:
@@ -19,15 +20,24 @@ namespace realsense2_camera
 
         private:
             void initializeOdometryInput();
+            void importLocalization();
+            void importLocalization(const std::string& localization_file);
+            void exportLocalization();
+            void exportLocalization(const std::string& export_file);
+            void initMapFrame(bool relocalizing);
             void setupSubscribers();
             void handleWarning();   
             void odom_in_callback(const nav_msgs::Odometry::ConstPtr& msg);
             void warningDiagnostic (diagnostic_updater::DiagnosticStatusWrapper &stat);
             diagnostic_updater::Updater callback_updater;
 
+            rs2::pose_sensor _pose_snr;
             ros::Subscriber _odom_subscriber;
             rs2::wheel_odometer _wo_snr;
             bool _use_odom_in;
             std::string  _T265_fault;
+            ros::Timer _timer;
+            bool relocalization_pose_initialized;
+            tf2_ros::TransformBroadcaster _dynamic_tf_broadcaster;
     };
 }
