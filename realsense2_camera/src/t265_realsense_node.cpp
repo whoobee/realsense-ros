@@ -7,6 +7,7 @@ T265RealsenseNode::T265RealsenseNode(ros::NodeHandle& nodeHandle,
                                      rs2::device dev,
                                      const std::string& serial_no) : 
                                      BaseRealSenseNode(nodeHandle, privateNodeHandle, dev, serial_no),
+                                     _t265_pnh(nodeHandle),
                                      _pose_sensor(dev.first<rs2::pose_sensor>()),
                                      _wo_snr(dev.first<rs2::wheel_odometer>()),
                                      _use_odom_in(false) 
@@ -20,7 +21,7 @@ T265RealsenseNode::T265RealsenseNode(ros::NodeHandle& nodeHandle,
 void T265RealsenseNode::initializeOdometryInput()
 {
     std::string calib_odom_file;
-    _pnh.param("calib_odom_file", calib_odom_file, std::string(""));
+    _t265_pnh.param("calib_odom_file", calib_odom_file, std::string(""));
     if (calib_odom_file.empty())
     {
         ROS_INFO("No calib_odom_file. No input odometry accepted.");
@@ -47,7 +48,7 @@ void T265RealsenseNode::initializeOdometryInput()
 void T265RealsenseNode::setupMapReutilization() {
     // Load map if configured in the launch file
     std::string localization_map_filepath;
-    _pnh.param("localization_map_filepath", localization_map_filepath, std::string(""));
+    _t265_pnh.param("localization_map_filepath", localization_map_filepath, DEFAULT_LOCALIZATION_MAP_PATH);
     if (localization_map_filepath.empty())
     {
         ROS_INFO("No [localization_map_filepath] specified. No localization data loaded.");
@@ -58,8 +59,18 @@ void T265RealsenseNode::setupMapReutilization() {
     }
     // Setup service to save map at runtime
     std::string service_save_map;
-    _pnh.param("service_save_map", service_save_map, DEFAULT_SERVICE_SAVE_MAP);
-    _save_map_srv = _pnh.advertiseService(service_save_map, &T265RealsenseNode::saveRelocalizationMapSrv, this);
+    _t265_pnh.param("service_save_map", service_save_map, DEFAULT_SERVICE_SAVE_MAP);
+    _save_map_srv = _node_handle.advertiseService(service_save_map, &T265RealsenseNode::saveRelocalizationMapSrv, this);
+
+    // Setup service to save static node at runtime
+    std::string service_save_static_node;
+    _t265_pnh.param("service_save_static_node", service_save_static_node, DEFAULT_SERVICE_SAVE_STATIC_NODE);
+    _save_static_node_srv = _node_handle.advertiseService(service_save_static_node, &T265RealsenseNode::saveStaticNodeSrv, this);
+    
+    // Setup service to read static node at runtime
+    std::string service_read_static_node;
+    _t265_pnh.param("service_read_static_node", service_read_static_node, DEFAULT_SERVICE_READ_STATIC_NODE);
+    _read_static_node_srv = _node_handle.advertiseService(service_read_static_node, &T265RealsenseNode::readStaticNodeSrv, this);
 }
 
 void T265RealsenseNode::toggleSensors(bool enabled)
@@ -94,7 +105,7 @@ void T265RealsenseNode::setupSubscribers()
     if (!_use_odom_in) return;
 
     std::string topic_odom_in;
-    _pnh.param("topic_odom_in", topic_odom_in, DEFAULT_TOPIC_ODOM_IN);
+    _t265_pnh.param("topic_odom_in", topic_odom_in, DEFAULT_TOPIC_ODOM_IN);
     ROS_INFO_STREAM("Subscribing to in_odom topic: " << topic_odom_in);
 
     _odom_subscriber = _node_handle.subscribe(topic_odom_in, 1, &T265RealsenseNode::odom_in_callback, this);
@@ -114,7 +125,7 @@ void T265RealsenseNode::odom_in_callback(const nav_msgs::Odometry::ConstPtr& msg
 void T265RealsenseNode::calcAndPublishStaticTransform(const stream_index_pair& stream, const rs2::stream_profile& base_profile)
 {
     // Transform base to stream
-    tf::Quaternion quaternion_optical;
+    tf::Quaternion quaternion_optical, tmp_q;
     quaternion_optical.setRPY(M_PI / 2, 0.0, -M_PI / 2);    //Pose To ROS
     float3 zero_trans{0, 0, 0};
 
@@ -137,8 +148,11 @@ void T265RealsenseNode::calcAndPublishStaticTransform(const stream_index_pair& s
             throw e;
         }
     }
-
     auto Q = rotationMatrixToQuaternion(ex.rotation);
+
+    _node_position = {ex.translation[0], ex.translation[1], ex.translation[2]};
+    _node_orientation = {(float)Q.x(), (float)Q.y(), (float)Q.z(), (float)Q.w()};
+
     Q = quaternion_optical * Q * quaternion_optical.inverse();
     float3 trans{ex.translation[0], ex.translation[1], ex.translation[2]};
     if (stream == POSE)
@@ -195,9 +209,92 @@ bool T265RealsenseNode::exportLocalizationMap(const std::string &localization_fi
     return true;
 }
 
+bool T265RealsenseNode::setStaticNode(const std::string &node_name)
+{
+    try
+    {
+        if(_pose_sensor.set_static_node(node_name, _node_position, _node_orientation))
+        {
+            ROS_INFO_STREAM("Static node '" << node_name << "' was sucessfuly set.");
+        }
+        else
+        {
+            ROS_INFO_STREAM("Error setting static node: " << node_name << ". Probably the sensor confidence was not high enough.");
+            ROS_INFO_STREAM("Try moving the sensor to ensure high confidence level.");
+
+            return false;
+        }
+    }
+    catch (std::runtime_error& e)
+    {
+        ROS_INFO_STREAM("Exception while setting static node: " << node_name << ".");
+
+        return false;
+    }
+
+    return true;
+}
+
+geometry_msgs::PoseStamped T265RealsenseNode::getStaticNode(const std::string &node_name, const std::string &node_frame)
+{
+    geometry_msgs::PoseStamped return_val;
+
+    rs2_vector node_position;
+    rs2_quaternion node_orientation;
+    
+    return_val.header.frame_id=node_frame;
+    return_val.header.stamp = ros::Time::now();
+
+    return_val.pose.position.x = 0;
+    return_val.pose.position.y = 0;
+    return_val.pose.position.z = 0;
+
+    return_val.pose.orientation.x = 0;
+    return_val.pose.orientation.y = 0;
+    return_val.pose.orientation.z = 0;
+    return_val.pose.orientation.w = 0;
+
+    try
+    {
+        if(_pose_sensor.get_static_node(node_name, node_position, node_orientation))
+        {
+            ROS_INFO_STREAM("Static node '" << node_name << "' was sucessfuly received from the sensor.");
+            return_val.pose.position.x = node_position.x;
+            return_val.pose.position.y = node_position.y;
+            return_val.pose.position.z = node_position.z;
+
+            return_val.pose.orientation.x = node_orientation.x;
+            return_val.pose.orientation.y = node_orientation.y;
+            return_val.pose.orientation.z = node_orientation.z;
+            return_val.pose.orientation.w = node_orientation.w;
+        }
+        else
+        {
+            ROS_INFO_STREAM("Error receiving static node: " << node_name << ".");
+        }
+    }
+    catch (std::runtime_error& e)
+    {
+        ROS_INFO_STREAM("Exception while receiving static node: " << node_name << ".");
+    }
+    return return_val;
+}
+
 bool T265RealsenseNode::saveRelocalizationMapSrv(realsense2_camera::MapPathString::Request &req,
                                                  realsense2_camera::MapPathString::Response &res) {
     res.success = this->exportLocalizationMap(req.filepath);
+    return true;
+}
+
+bool T265RealsenseNode::saveStaticNodeSrv(realsense2_camera::NodeNameString::Request &req,
+                                          realsense2_camera::NodeNameString::Response &res) {
+    res.success = this->setStaticNode(req.name);
+    return true;
+}
+
+bool T265RealsenseNode::readStaticNodeSrv(realsense2_camera::NodePosition::Request &req,
+                                          realsense2_camera::NodePosition::Response &res) {
+    res.position = this->getStaticNode(req.name, req.frame);
     return true;
 }
 

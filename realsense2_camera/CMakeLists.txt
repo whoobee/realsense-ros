@@ -74,6 +74,8 @@ add_message_files(
 add_service_files(
     FILES
     MapPathString.srv
+    NodeNameString.srv
+    NodePosition.srv
     )
 
 generate_messages(

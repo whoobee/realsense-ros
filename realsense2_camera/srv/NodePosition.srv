@@ -1,0 +1,4 @@
+string name
+string frame
+---
+geometry_msgs/PoseStamped position

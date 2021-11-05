@@ -97,7 +97,9 @@
 
   <!-- Parameters for loading/saving maps on the T265 -->
   <arg name="localization_map_filepath" default=""/> <!-- If non-empty, we try to load a T265 map at node startup -->
-  <arg name="service_save_map"          default="$(arg tf_prefix)/save_map_to_path"/>
+  <arg name="service_save_map"          default="relocation/save_map_to_path"/>
+  <arg name="service_save_static_node"  default="relocation/save_static_node"/>
+  <arg name="service_read_static_node"  default="relocation/read_static_node"/>
 
   <arg name="stereo_module/exposure/1" default="7500"/>
   <arg name="stereo_module/gain/1"     default="16"/>
@@ -106,6 +108,8 @@
 
   <param name="localization_map_filepath" type="str"  value="$(arg localization_map_filepath)"/>
   <param name="service_save_map"          type="str"  value="$(arg service_save_map)"/>
+  <param name="service_save_static_node"  type="str"  value="$(arg service_save_static_node)"/>
+  <param name="service_read_static_node"  type="str"  value="$(arg service_read_static_node)"/>
 
   <arg name="filters"                  default=""/>
   <arg name="clip_distance"            default="-1"/>
