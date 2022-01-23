@@ -125,7 +125,7 @@ void T265RealsenseNode::odom_in_callback(const nav_msgs::Odometry::ConstPtr& msg
 void T265RealsenseNode::calcAndPublishStaticTransform(const stream_index_pair& stream, const rs2::stream_profile& base_profile)
 {
     // Transform base to stream
-    tf::Quaternion quaternion_optical, tmp_q;
+    tf::Quaternion quaternion_optical;
     quaternion_optical.setRPY(M_PI / 2, 0.0, -M_PI / 2);    //Pose To ROS
     float3 zero_trans{0, 0, 0};
 
@@ -258,15 +258,22 @@ geometry_msgs::PoseStamped T265RealsenseNode::getStaticNode(const std::string &n
     {
         if(_pose_sensor.get_static_node(node_name, node_position, node_orientation))
         {
+            tf::Quaternion Q(node_orientation.x, node_orientation.y, node_orientation.z, node_orientation.w);
+            tf::Quaternion quaternion_optical;
+            quaternion_optical.setRPY(M_PI / 2, 0.0, -M_PI / 2);    //Pose To ROS
+
+            Q = quaternion_optical * Q * quaternion_optical.inverse();
+            Q = Q.inverse();
+
             ROS_INFO_STREAM("Static node '" << node_name << "' was sucessfuly received from the sensor.");
             return_val.pose.position.x = node_position.x;
             return_val.pose.position.y = node_position.y;
             return_val.pose.position.z = node_position.z;
 
-            return_val.pose.orientation.x = node_orientation.x;
-            return_val.pose.orientation.y = node_orientation.y;
-            return_val.pose.orientation.z = node_orientation.z;
-            return_val.pose.orientation.w = node_orientation.w;
+            return_val.pose.orientation.x = Q.x();
+            return_val.pose.orientation.y = Q.y();
+            return_val.pose.orientation.z = Q.z();
+            return_val.pose.orientation.w = Q.w();
         }
         else
         {
